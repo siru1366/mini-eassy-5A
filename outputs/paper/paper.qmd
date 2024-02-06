@@ -1,13 +1,12 @@
 ---
-title: "My title"
-subtitle: "My subtitle if needed"
+title: "Eassy 5A"
+
 author: 
-  - First author
-  - Another author
-thanks: "Code and data are available at: LINK."
-date: today
+  - Sirui Tan
+  
+thanks: "Code and data are available at:https://github.com/siru1366/mini-eassy-5B."
+date: 2.24 2024
 date-format: long
-abstract: "First sentence. Second sentence. Third sentence. Fourth sentence."
 format: pdf
 number-sections: true
 bibliography: references.bib
@@ -17,17 +16,25 @@ bibliography: references.bib
 #| include: false
 #| warning: false
 #| message: false
-
+install.packages("rvest")
 library(tidyverse)
-library(palmerpenguins)
+install.packages("rvest")
+install.packages("janitor")
+install.packages("rvest")  
+install.packages("knitr")
+library(janitor)
+library(tidyverse)
+library(rvest)
+library(knitr) 
+
 ```
 
 
 # Introduction
 
-You can and should cross-reference sections and sub-sections. 
+The data employed in this paper was sourced from the wiki.
+Data cleaning and analysis were conducted using the open-source statistical programming language R (@citeR), leveraging functionalities from the tidyverse (@tidyverse) suite, including ggplot2 (@ggplot2), dplyr (@dplyr), readr (@readr), tibble (@tibble),stringr (@stringr) ,janitor (@janitor) and knitr (@knitr). The detailed procedures for data extraction and cleaning are expounded upon in the subsequent subsections.
 
-The remainder of this paper is structured as follows. @sec-data....
 
 
 
@@ -37,183 +44,108 @@ Some of our data is of penguins (@fig-bills), from @palmerpenguins.
 
 ```{r}
 #| label: fig-bills
-#| fig-cap: Bills of penguins
+#| fig-cap: Prime Ministers of the Australia
 #| echo: false
+parsed_data <- read_html("https://en.wikipedia.org/wiki/List_of_prime_ministers_of_Australia") 
 
-ggplot(penguins, aes(x = island, fill = species)) +
-  geom_bar(alpha = 0.8) +
-  scale_fill_manual(values = c("darkorange","purple","cyan4"),
-                    guide = "none") +
-  theme_minimal() +
-  facet_wrap(~species, ncol = 1) +
-  coord_flip()
-```
+# Extract the table containing the prime ministers' information
+table <- html_table(parsed_data, fill = TRUE)[[1]]
 
-Talk more about it.
+# Clean column names
+table_clean <- table |> 
+  clean_names()
 
-And also planes (@fig-planes). (You can change the height and width, but don't worry about doing that until you have finished every other aspect of the paper - Quarto will try to make it look nice and the defaults usually work well once you have enough text.)
+# Inspect column names
+colnames(table_clean)
 
-```{r}
-#| label: fig-planes
-#| fig-cap: Relationship between wing length and width
-#| echo: false
-#| warning: false
-#| message: false
+# Rename the column with the correct name
+table_clean <- table_clean |> 
+  rename(raw_text = `name_birth_death_constituency`)
 
-analysis_data <- read_csv(here::here("outputs/data/analysis_data.csv"))
-
-analysis_data |> 
-  ggplot(aes(x = width, y = length)) +
-  geom_point(alpha = 0.8) +
-  theme_minimal() +
-  labs(x = "Wing width (mm)",
-       y = "Wing length (mm)")
-```
-
-Talk way more about it. 
+# Select the desired column and remove duplicates
+parsed_data_clean <- table_clean |> 
+  select(raw_text) |> 
+  filter(raw_text != "name_birth_death_constituency") |> 
+  distinct()
 
 
 
-# Model
+initial_clean <- parsed_data_clean |> 
+  separate(
+    "raw_text", 
+    into = c("name", "birth_death_constituency"), 
+    sep = "\\(", 
+    extra = "merge", 
+    fill = "right"
+  ) |> 
+  separate(
+    "birth_death_constituency", 
+    into = c("birth_death", "constituency"), 
+    sep = "\\)", 
+    extra = "merge", 
+    fill = "right"
+  ) |> 
+  separate(
+    "birth_death", 
+    into = c("birth", "death"), 
+    sep = "–", 
+    extra = "merge", 
+    fill = "right"
+  ) |> 
+  select(name, birth, death)
 
-The goal of our modelling strategy is twofold. Firstly,...
-
-Here we briefly describe the Bayesian analysis model used to investigate... Background details and diagnostics are included in [Appendix -@sec-model-details].
-
-## Model set-up
-
-Define $y_i$ as the number of seconds that the plane remained aloft. Then $\beta_i$ is the wing width and $\gamma_i$ is the wing length, both measured in millimeters.  
-
-\begin{align} 
-y_i|\mu_i, \sigma &\sim \mbox{Normal}(\mu_i, \sigma) \\
-\mu_i &= \alpha + \beta_i + \gamma_i\\
-\alpha &\sim \mbox{Normal}(0, 2.5) \\
-\beta &\sim \mbox{Normal}(0, 2.5) \\
-\gamma &\sim \mbox{Normal}(0, 2.5) \\
-\sigma &\sim \mbox{Exponential}(1)
-\end{align}
-
-We run the model in R [@citeR] using the `rstanarm` package of @rstanarm. We use the default priors from `rstanarm`.
-
-
-### Model justification
-
-We expect a positive relationship between the size of the wings and time spent aloft. In particular...
-
-We can use maths by including latex between dollar signs, for instance $\theta$.
-
-
-# Results
-
-Our results are summarized in @tbl-modelresults.
-
-```{r}
-#| echo: false
-#| eval: true
-#| warning: false
-#| message: false
-
-library(rstanarm)
-
-first_model <-
-  readRDS(file = here::here("outputs/models/first_model.rds"))
-```
-
-```{r}
-#| echo: false
-#| eval: true
-#| label: tbl-modelresults
-#| tbl-cap: "Explanatory models of flight time based on wing width and wing length"
-#| warning: false
-
-modelsummary::modelsummary(
-  list(
-    "First model" = first_model
-  ),
-  statistic = "mad",
-  fmt = 2
-)
-```
+initial_clean <- initial_clean %>%
+  filter(name != "Name")
 
 
 
+initial_clean <- initial_clean |>
+  mutate(Age_at_Death = as.numeric(death) - as.numeric(birth))
 
-# Discussion
+initial_clean <- as.data.frame(initial_clean)
 
-## First discussion point {#sec-first-point}
-
-If my paper were 10 pages, then should be be at least 2.5 pages. The discussion is a chance to show off what you know and what you learnt from all this. 
-
-## Second discussion point
-
-## Third discussion point
-
-## Weaknesses and next steps
-
-Weaknesses and next steps should also be included.
-
-\newpage
-
-\appendix
-
-# Appendix {-}
+initial_clean <- initial_clean %>%
+  filter(name != "Name")
 
 
-# Additional data details
-
-# Model details {#sec-model-details}
-
-## Posterior predictive check
-
-In @fig-ppcheckandposteriorvsprior-1 we implement a posterior predictive check. This shows...
-
-In @fig-ppcheckandposteriorvsprior-2 we compare the posterior with the prior. This shows... 
-
-```{r}
-#| eval: true
-#| echo: false
-#| message: false
-#| warning: false
-#| label: fig-ppcheckandposteriorvsprior
-#| layout-ncol: 2
-#| fig-cap: "Examining how the model fits, and is affected by, the data"
-#| fig-subcap: ["Posterior prediction check", "Comparing the posterior with the prior"]
-
-pp_check(first_model) +
-  theme_classic() +
-  theme(legend.position = "bottom")
-
-posterior_vs_prior(first_model) +
+initial_clean |>
+  mutate(
+    still_alive = if_else(is.na(death), "Yes", "No"),
+     died = if_else(is.na(death), 2023L, as.integer(death))
+  ) |>
+  mutate(name = as_factor(name)) |>
+  ggplot(
+    aes(x = birth, xend = death, y = name, yend = name, color = still_alive)
+    ) +
+  geom_segment() +
+  labs(
+    x = "Year of birth", y = "Prime minister", color = "PM is currently alive"
+    ) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1") +
-  theme(legend.position = "bottom") +
-  coord_flip()
+  theme(legend.position = "bottom")
+  
+
 ```
+After gathering and cleaning the data on the prime ministers of Australia, we observed several interesting patterns. The dataset spans from the late 19th century to the late 20th century, covering a significant period of Australian political history. One notable trend is the increasing longevity of prime ministers over time. While early prime ministers such as Edmund Barton and Alfred Deakin had relatively short tenures, later prime ministers like Robert Menzies and John Howard served much longer terms, indicating a potential shift in the political landscape or leadership stability over the years.
 
-## Diagnostics
+Another intriguing observation is the age at which prime ministers assumed office and their life expectancies. While some prime ministers, like John Howard, served well into their older years, others, such as Joseph Lyons, passed away relatively young. Analyzing these age and tenure dynamics can provide insights into the challenges and opportunities faced by political leaders and their impact on governance and policy-making.
 
-@fig-stanareyouokay-1 is a trace plot. It shows... This suggests...
+Furthermore, the dataset highlights the diversity of backgrounds among Australian prime ministers, including varying birth years and constituencies. Exploring these demographic factors alongside political careers can shed light on the representation and inclusivity within Australian politics throughout history.
 
-@fig-stanareyouokay-2 is a Rhat plot. It shows... This suggests...
+The data was sourced from Wikipedia, specifically the page listing the prime ministers of Australia. The process involved web scraping using the rvest package in R to extract relevant information from the webpage. Once extracted, the data was cleaned and transformed using various data wrangling techniques in R, such as splitting columns, extracting numeric values, and handling missing data.
 
-```{r}
-#| echo: false
-#| eval: true
-#| message: false
-#| warning: false
-#| label: fig-stanareyouokay
-#| fig-cap: "Checking the convergence of the MCMC algorithm"
-#| fig-subcap: ["Trace plot", "Rhat plot"]
-#| layout-ncol: 2
+The web scraping process involved identifying the HTML structure of the Wikipedia page and using CSS selectors to target specific elements containing the desired information. This process required careful inspection of the webpage's structure and experimentation with different selectors to accurately capture the relevant data fields.
 
-plot(first_model, "trace")
+One challenge encountered during the data collection process was handling inconsistencies in the formatting of the data on the Wikipedia page. For example, variations in the representation of birth and death years required additional preprocessing steps to ensure uniformity and accuracy in the final dataset.
 
-plot(first_model, "rhat")
-```
+Despite these challenges, the process of gathering and analyzing the data was both educational and rewarding. It provided valuable insights into the history of Australian politics and the individuals who shaped it. Additionally, it offered an opportunity to practice web scraping and data wrangling skills in a real-world context.
+
+In future iterations of this project, I would streamline the data collection process by refining the web scraping code to handle edge cases more effectively and automate repetitive tasks. Additionally, I would explore additional sources of data to enrich the analysis and provide a more comprehensive understanding of the factors influencing political leadership in Australia.
 
 
 
-\newpage
+
 
 
 # References
